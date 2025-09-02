@@ -18,14 +18,14 @@ router.get('/', async (req, res) => {
 
 // Book a new appointment
 router.post('/', async (req, res) => {
-  const { name, email, date, time } = req.body;
-  if (!name || !email || !date || !time) {
+  const { name, email, date, time, branch } = req.body;
+  if (!name || !email || !date || !time || !branch) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
     const [result] = await db.query(
-      'INSERT INTO appointments (name, email, date, time, status) VALUES (?, ?, ?, ?, ?)',
-      [name, email, date, time, 'pending']
+      'INSERT INTO appointments (name, email, date, time, branch, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, date, time, branch, 'pending']
     );
     const [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
