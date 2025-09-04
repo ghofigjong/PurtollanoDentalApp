@@ -31,16 +31,32 @@ router.post('/', async (req, res) => {
   if (hmoMembershipNumber === '') hmoMembershipNumber = null;
   if (employer === '') employer = null;
   if (!name || !email || !date || !time || !branch || !phone || !procedure) {
+    console.error('Missing required fields:', { name, email, date, time, branch, phone, procedure });
     return res.status(400).json({ error: 'Missing required fields' });
   }
   try {
-    const [result] = await db.query(
-      'INSERT INTO appointments (name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending']
-    );
-    const [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [result.insertId]);
+    let result;
+    try {
+      result = await db.query(
+        'INSERT INTO appointments (name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending']
+      );
+    } catch (dbErr) {
+      console.error('DB error (insert appointment):', dbErr, {
+        name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer
+      });
+      return res.status(500).json({ error: 'Database insert error', details: dbErr.message });
+    }
+    let rows;
+    try {
+      [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [result[0].insertId]);
+    } catch (dbErr) {
+      console.error('DB error (select after insert):', dbErr, { insertId: result[0].insertId });
+      return res.status(500).json({ error: 'Database select error', details: dbErr.message });
+    }
     res.status(201).json(rows[0]);
   } catch (err) {
+    console.error('General error in POST /appointments:', err, { body: req.body });
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
