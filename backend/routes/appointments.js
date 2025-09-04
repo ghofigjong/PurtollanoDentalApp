@@ -22,10 +22,14 @@ router.get('/', async (req, res) => {
 // Book a new appointment
 router.post('/', async (req, res) => {
   console.log('POST /appointments payload:', req.body);
-  const {
+  let {
     name, email, phone = null, procedure = null, date, time, branch,
     underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null
   } = req.body;
+  // Convert empty strings to null for optional fields
+  if (hmoProvider === '') hmoProvider = null;
+  if (hmoMembershipNumber === '') hmoMembershipNumber = null;
+  if (employer === '') employer = null;
   if (!name || !email || !date || !time || !branch || !phone || !procedure) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
