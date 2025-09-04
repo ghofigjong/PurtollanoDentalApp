@@ -49,8 +49,8 @@ router.post('/', async (req, res) => {
 // Accept or cancel an appointment
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
-  if (!['accepted', 'cancelled'].includes(status)) {
+  const { status, date, time } = req.body;
+  if (!['accepted', 'cancelled', 'pending'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
   try {
@@ -58,9 +58,9 @@ router.patch('/:id', async (req, res) => {
     if (status === 'accepted') {
       // Generate unique booking id
       bookingId = generateBookingId();
-      await db.query('UPDATE appointments SET status = ?, bookingId = ? WHERE id = ?', [status, bookingId, id]);
+      await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ? WHERE id = ?', [status, bookingId, date, time, id]);
     } else {
-      await db.query('UPDATE appointments SET status = ? WHERE id = ?', [status, id]);
+      await db.query('UPDATE appointments SET status = ?, date = ?, time = ? WHERE id = ?', [status, date, time, id]);
     }
     const [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [id]);
     const appt = rows[0];
