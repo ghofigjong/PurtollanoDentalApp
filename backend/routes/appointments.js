@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
     let result;
     try {
       result = await db.query(
-        'INSERT INTO appointments (name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending']
       );
     } catch (dbErr) {
