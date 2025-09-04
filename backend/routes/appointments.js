@@ -50,7 +50,9 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
   const { status, date, time } = req.body;
+  console.log('PATCH /appointments/:id', { id, body: req.body });
   if (!['accepted', 'cancelled', 'pending'].includes(status)) {
+    console.error('Invalid status:', status);
     return res.status(400).json({ error: 'Invalid status' });
   }
   try {
@@ -58,11 +60,27 @@ router.patch('/:id', async (req, res) => {
     if (status === 'accepted') {
       // Generate unique booking id
       bookingId = generateBookingId();
-      await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ? WHERE id = ?', [status, bookingId, date, time, id]);
+      try {
+        await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ? WHERE id = ?', [status, bookingId, date, time, id]);
+      } catch (dbErr) {
+        console.error('DB error (accepted):', dbErr, { status, bookingId, date, time, id });
+        return res.status(500).json({ error: 'Database update error (accepted)', details: dbErr.message });
+      }
     } else {
-      await db.query('UPDATE appointments SET status = ?, date = ?, time = ? WHERE id = ?', [status, date, time, id]);
+      try {
+        await db.query('UPDATE appointments SET status = ?, date = ?, time = ? WHERE id = ?', [status, date, time, id]);
+      } catch (dbErr) {
+        console.error('DB error (other status):', dbErr, { status, date, time, id });
+        return res.status(500).json({ error: 'Database update error (other status)', details: dbErr.message });
+      }
     }
-    const [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [id]);
+    let rows;
+    try {
+      [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [id]);
+    } catch (dbErr) {
+      console.error('DB error (select after update):', dbErr, { id });
+      return res.status(500).json({ error: 'Database select error', details: dbErr.message });
+    }
     const appt = rows[0];
     // Send email if accepted
     if (status === 'accepted' && appt && appt.email) {
@@ -80,6 +98,7 @@ router.patch('/:id', async (req, res) => {
     }
     res.json(appt);
   } catch (err) {
+    console.error('General error in PATCH /appointments/:id:', err, { id, body: req.body });
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
