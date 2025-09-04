@@ -102,14 +102,26 @@ router.patch('/:id', async (req, res) => {
       return res.status(500).json({ error: 'Database select error', details: dbErr.message });
     }
     const appt = rows[0];
+    // Format date for email: 'Day Mon DD YYYY'
+    let formattedDate = appt.date;
+    if (appt.date) {
+      try {
+        const dateObj = new Date(appt.date);
+        if (!isNaN(dateObj)) {
+          formattedDate = dateObj.toDateString(); // e.g., 'Sat Sep 06 2025'
+        }
+      } catch (e) {
+        // fallback to original
+      }
+    }
     // Send email if accepted
     if (status === 'accepted' && appt && appt.email) {
       try {
         await sendMail({
           to: appt.email,
           subject: 'Your Puertollano Dental Appointment is Confirmed',
-          text: `Dear ${appt.name},\n\nYour appointment has been accepted. Your booking confirmation ID is ${appt.bookingId}.\n\nDate: ${appt.date}\nTime: ${appt.time}\nBranch: ${appt.branch}\n\nPlease keep this ID for your records.\n\nThank you!`,
-          html: `<p>Dear ${appt.name},</p><p>Your appointment has been <b>accepted</b>.</p><p><b>Booking Confirmation ID:</b> <span style='font-size:1.2em'>${appt.bookingId}</span></p><ul><li><b>Date:</b> ${appt.date}</li><li><b>Time:</b> ${appt.time}</li><li><b>Branch:</b> ${appt.branch}</li></ul><p>Please keep this ID for your records.<br>Thank you!</p>`
+          text: `Dear ${appt.name},\n\nYour appointment has been accepted. Your booking confirmation ID is ${appt.bookingId}.\n\nDate: ${formattedDate}\nTime: ${appt.time}\nBranch: ${appt.branch}\n\nPlease keep this ID for your records.\n\nThank you!`,
+          html: `<p>Dear ${appt.name},</p><p>Your appointment has been <b>accepted</b>.</p><p><b>Booking Confirmation ID:</b> <span style='font-size:1.2em'>${appt.bookingId}</span></p><ul><li><b>Date:</b> ${formattedDate}</li><li><b>Time:</b> ${appt.time}</li><li><b>Branch:</b> ${appt.branch}</li></ul><p>Please keep this ID for your records.<br>Thank you!</p>`
         });
       } catch (mailErr) {
         // Log but don't fail the request
@@ -119,6 +131,56 @@ router.patch('/:id', async (req, res) => {
     res.json(appt);
   } catch (err) {
     console.error('General error in PATCH /appointments/:id:', err, { id, body: req.body });
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+
+// Lookup appointment by bookingId and email
+router.post('/lookup', async (req, res) => {
+  const { bookingId, email } = req.body;
+  if (!bookingId || !email) {
+    return res.status(400).json({ error: 'Missing bookingId or email' });
+  }
+  try {
+    const [rows] = await db.query('SELECT id, date, status FROM appointments WHERE bookingId = ? AND email = ?', [bookingId, email]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    res.json({ date: rows[0].date, status: rows[0].status });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Cancel appointment by bookingId and email (set status to 'cancelled')
+router.post('/cancel', async (req, res) => {
+  const { bookingId, email } = req.body;
+  if (!bookingId || !email) {
+    return res.status(400).json({ error: 'Missing bookingId or email' });
+  }
+  try {
+    // Get appointment
+    const [rows] = await db.query('SELECT id, date, status FROM appointments WHERE bookingId = ? AND email = ?', [bookingId, email]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    const appt = rows[0];
+    // Check if already cancelled
+    if (appt.status === 'cancelled') {
+      return res.status(400).json({ error: 'Appointment already cancelled' });
+    }
+    // Check if more than 3 days away
+    const today = new Date();
+    const apptDate = new Date(appt.date);
+    const diff = (apptDate - today) / (1000 * 60 * 60 * 24);
+    if (diff <= 3) {
+      return res.status(400).json({ error: 'Cannot cancel less than 3 days before appointment' });
+    }
+    // Cancel appointment
+    await db.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
   }
 });
