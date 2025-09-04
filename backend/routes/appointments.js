@@ -21,6 +21,7 @@ router.get('/', async (req, res) => {
 
 // Book a new appointment
 router.post('/', async (req, res) => {
+  console.log('POST /appointments payload:', req.body);
   const {
     name, email, phone = null, procedure = null, date, time, branch,
     underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null
