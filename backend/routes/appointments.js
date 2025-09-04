@@ -49,8 +49,12 @@ router.post('/', async (req, res) => {
 // Accept or cancel an appointment
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  const { status, date, time } = req.body;
-  console.log('PATCH /appointments/:id', { id, body: req.body });
+  let { status, date, time } = req.body;
+  // Sanitize date to YYYY-MM-DD if it is an ISO string
+  if (typeof date === 'string' && date.includes('T')) {
+    date = date.split('T')[0];
+  }
+  console.log('PATCH /appointments/:id', { id, body: { ...req.body, date } });
   if (!['accepted', 'cancelled', 'pending'].includes(status)) {
     console.error('Invalid status:', status);
     return res.status(400).json({ error: 'Invalid status' });
