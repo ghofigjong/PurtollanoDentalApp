@@ -38,7 +38,7 @@ router.post('/', async (req, res) => {
     let result;
     try {
       result = await db.query(
-        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status, lastUpdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
         [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending']
       );
     } catch (dbErr) {
@@ -81,14 +81,14 @@ router.patch('/:id', async (req, res) => {
       // Generate unique booking id
       bookingId = generateBookingId();
       try {
-        await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ? WHERE id = ?', [status, bookingId, date, time, id]);
+        await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?', [status, bookingId, date, time, id]);
       } catch (dbErr) {
         console.error('DB error (accepted):', dbErr, { status, bookingId, date, time, id });
         return res.status(500).json({ error: 'Database update error (accepted)', details: dbErr.message });
       }
     } else {
       try {
-        await db.query('UPDATE appointments SET status = ?, date = ?, time = ? WHERE id = ?', [status, date, time, id]);
+        await db.query('UPDATE appointments SET status = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?', [status, date, time, id]);
       } catch (dbErr) {
         console.error('DB error (other status):', dbErr, { status, date, time, id });
         return res.status(500).json({ error: 'Database update error (other status)', details: dbErr.message });
@@ -177,9 +177,9 @@ router.post('/cancel', async (req, res) => {
     if (diff <= 3) {
       return res.status(400).json({ error: 'Cannot cancel less than 3 days before appointment' });
     }
-    // Cancel appointment
-    await db.query('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', appt.id]);
-    res.json({ success: true });
+  // Cancel appointment, set remarks
+  await db.query('UPDATE appointments SET status = ?, remarks = ?, lastUpdate = NOW() WHERE id = ?', ['cancelled', 'cancelled by patient', appt.id]);
+  res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
   }
