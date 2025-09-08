@@ -5,7 +5,7 @@ const db = require('../db');
 // Get all patients
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM patients ORDER BY id DESC');
+    const [rows] = await db.query('SELECT * FROM patients ORDER BY patient_id DESC');
     res.json(rows);
   } catch (err) {
     console.error('Error in GET /patients:', {
