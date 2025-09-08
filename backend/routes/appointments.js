@@ -1,20 +1,3 @@
-// Get booked times for a branch and date (status = Accepted)
-router.get('/booked', async (req, res) => {
-  const { branch, date } = req.query;
-  if (!branch || !date) {
-    return res.status(400).json({ error: 'Missing branch or date' });
-  }
-  try {
-    const [rows] = await db.query(
-      'SELECT time FROM appointments WHERE branch = ? AND date = ? AND status = ? ORDER BY time ASC',
-      [branch, date, 'accepted']
-    );
-    // Return array of times
-    res.json({ bookedTimes: rows.map(r => r.time) });
-  } catch (err) {
-    res.status(500).json({ error: 'Database error', details: err.message });
-  }
-});
 const express = require('express');
 const router = express.Router();
 
@@ -30,6 +13,24 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM appointments ORDER BY id DESC');
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error', details: err.message });
+  }
+});
+
+// Get booked times for a branch and date (status = Accepted)
+router.get('/booked', async (req, res) => {
+  const { branch, date } = req.query;
+  if (!branch || !date) {
+    return res.status(400).json({ error: 'Missing branch or date' });
+  }
+  try {
+    const [rows] = await db.query(
+      'SELECT time FROM appointments WHERE branch = ? AND date = ? AND status = ? ORDER BY time ASC',
+      [branch, date, 'accepted']
+    );
+    // Return array of times
+    res.json({ bookedTimes: rows.map(r => r.time) });
   } catch (err) {
     res.status(500).json({ error: 'Database error', details: err.message });
   }
