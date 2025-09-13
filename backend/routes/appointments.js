@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
 // Accept or cancel an appointment
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  let { status, date, time } = req.body;
+  let { status, date, time, remarks } = req.body;
   // Sanitize date to YYYY-MM-DD if it is an ISO string
   if (typeof date === 'string' && date.includes('T')) {
     date = date.split('T')[0];
@@ -98,27 +98,24 @@ router.patch('/:id', async (req, res) => {
     if (status === 'accepted') {
       // Generate unique booking id
       bookingId = generateBookingId();
-      try {
-        await db.query('UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?', [status, bookingId, date, time, id]);
-      } catch (dbErr) {
-        console.error('DB error (accepted):', dbErr, { status, bookingId, date, time, id });
-        return res.status(500).json({ error: 'Database update error (accepted)', details: dbErr.message });
-      }
+      await db.query(
+        'UPDATE appointments SET status = ?, bookingId = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?',
+        [status, bookingId, date, time, id]
+      );
+    } else if (status === 'cancelled') {
+      // Save cancellation reason in remarks
+      await db.query(
+        'UPDATE appointments SET status = ?, date = ?, time = ?, remarks = ?, lastUpdate = NOW() WHERE id = ?',
+        [status, date, time, remarks || null, id]
+      );
     } else {
-      try {
-        await db.query('UPDATE appointments SET status = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?', [status, date, time, id]);
-      } catch (dbErr) {
-        console.error('DB error (other status):', dbErr, { status, date, time, id });
-        return res.status(500).json({ error: 'Database update error (other status)', details: dbErr.message });
-      }
+      await db.query(
+        'UPDATE appointments SET status = ?, date = ?, time = ?, lastUpdate = NOW() WHERE id = ?',
+        [status, date, time, id]
+      );
     }
     let rows;
-    try {
-      [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [id]);
-    } catch (dbErr) {
-      console.error('DB error (select after update):', dbErr, { id });
-      return res.status(500).json({ error: 'Database select error', details: dbErr.message });
-    }
+    [rows] = await db.query('SELECT * FROM appointments WHERE id = ?', [id]);
     const appt = rows[0];
     // Format date for email: 'Day Mon DD YYYY'
     let formattedDate = appt.date;
