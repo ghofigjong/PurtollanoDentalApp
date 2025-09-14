@@ -42,12 +42,13 @@ router.post('/', async (req, res) => {
   console.log('POST /appointments payload:', req.body);
   let {
     name, email, phone = null, procedure = null, date, time, branch,
-    underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null
+    underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null, note = null
   } = req.body;
   // Convert empty strings to null for optional fields
   if (hmoProvider === '') hmoProvider = null;
   if (hmoMembershipNumber === '') hmoMembershipNumber = null;
   if (employer === '') employer = null;
+  if (note === '') note = null;
   if (!name || !email || !date || !time || !branch || !phone || !procedure) {
     console.error('Missing required fields:', { name, email, date, time, branch, phone, procedure });
     return res.status(400).json({ error: 'Missing required fields' });
@@ -56,12 +57,12 @@ router.post('/', async (req, res) => {
     let result;
     try {
       result = await db.query(
-        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status, lastUpdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-        [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending']
+        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status, lastUpdate, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
+        [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending', note]
       );
     } catch (dbErr) {
       console.error('DB error (insert appointment):', dbErr, {
-        name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer
+        name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, note
       });
       return res.status(500).json({ error: 'Database insert error', details: dbErr.message });
     }
