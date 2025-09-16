@@ -1,0 +1,11 @@
+export const APPOINTMENT_STATUS = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  CANCELLED: 'cancelled'
+};
+
+export const STATUS_COLORS = {
+  [APPOINTMENT_STATUS.ACCEPTED]: '#43a047',
+  [APPOINTMENT_STATUS.CANCELLED]: '#e53935',
+  [APPOINTMENT_STATUS.PENDING]: '#bdbdbd'
+};
