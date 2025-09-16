@@ -7,6 +7,20 @@ const db = require('../db');
 const { sendMail } = require('../utils/mailer');
 const { generateBookingId } = require('../utils/bookingId');
 
+// Helper to format 24-hour time (HH:MM or HH:MM:SS) to 12-hour format with AM/PM
+function formatTime12(time24) {
+  if (!time24 || typeof time24 !== 'string') return time24 || '';
+  const parts = time24.split(':');
+  if (!parts.length) return time24;
+  let hh = parseInt(parts[0], 10);
+  if (isNaN(hh)) return time24;
+  const mm = parts[1] ? parts[1].slice(0, 2) : '00';
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+  return `${hh}:${mm} ${ampm}`;
+}
+
 
 // Get all appointments
 router.get('/', async (req, res) => {
@@ -42,7 +56,7 @@ router.post('/', async (req, res) => {
   console.log('POST /appointments payload:', req.body);
   let {
     name, email, phone = null, procedure = null, date, time, branch,
-    underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null, note = null
+    underHMO = 'No', hmoProvider = null, hmoMembershipNumber = null, employer = null, note = null, numPatients = 1
   } = req.body;
   // Convert empty strings to null for optional fields
   if (hmoProvider === '') hmoProvider = null;
@@ -57,8 +71,8 @@ router.post('/', async (req, res) => {
     let result;
     try {
       result = await db.query(
-        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status, lastUpdate, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)',
-        [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending', note]
+        'INSERT INTO appointments (name, email, phone, `procedure`, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, status, lastUpdate, note, numPatients) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)',
+        [name, email, phone, procedure, date, time, branch, underHMO, hmoProvider, hmoMembershipNumber, employer, 'pending', note, numPatients]
       );
     } catch (dbErr) {
       console.error('DB error (insert appointment):', dbErr, {
@@ -133,11 +147,12 @@ router.patch('/:id', async (req, res) => {
     // Send email if accepted
     if (status === 'accepted' && appt && appt.email) {
       try {
+        const timeDisplay = formatTime12(appt.time);
         await sendMail({
           to: appt.email,
           subject: 'Your Puertollano Dental Appointment is Confirmed',
-          text: `Dear ${appt.name},\n\nYour appointment has been accepted. Your booking confirmation ID is ${appt.bookingId}.\n\nDate: ${formattedDate}\nTime: ${appt.time}\nBranch: ${appt.branch}\n\nPlease keep this ID for your records.\n\nThank you!`,
-          html: `<p>Dear ${appt.name},</p><p>Your appointment has been <b>accepted</b>.</p><p><b>Booking Confirmation ID:</b> <span style='font-size:1.2em'>${appt.bookingId}</span></p><ul><li><b>Date:</b> ${formattedDate}</li><li><b>Time:</b> ${appt.time}</li><li><b>Branch:</b> ${appt.branch}</li></ul><p>Please keep this ID for your records.<br>Thank you!</p>`
+          text: `Dear ${appt.name},\n\nYour appointment has been accepted. Your booking confirmation ID is ${appt.bookingId}.\n\nDate: ${formattedDate}\nTime: ${timeDisplay}\nBranch: ${appt.branch}\n\nPlease keep this ID for your records.\n\nThank you!`,
+          html: `<p>Dear ${appt.name},</p><p>Your appointment has been <b>accepted</b>.</p><p><b>Booking Confirmation ID:</b> <span style='font-size:1.2em'>${appt.bookingId}</span></p><ul><li><b>Date:</b> ${formattedDate}</li><li><b>Time:</b> ${timeDisplay}</li><li><b>Branch:</b> ${appt.branch}</li></ul><p>Please keep this ID for your records.<br>Thank you!</p>`
         });
       } catch (mailErr) {
         // Log but don't fail the request
