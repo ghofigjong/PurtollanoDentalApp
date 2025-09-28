@@ -87,6 +87,86 @@ router.post('/', async (req, res) => {
       console.error('DB error (select after insert):', dbErr, { insertId: result[0].insertId });
       return res.status(500).json({ error: 'Database select error', details: dbErr.message });
     }
+
+    // Send notification email to administrators
+    const appointment = rows[0];
+    try {
+      // Format date for email display
+      let formattedDate = appointment.date;
+      if (appointment.date) {
+        try {
+          const dateObj = new Date(appointment.date);
+          if (!isNaN(dateObj)) {
+            formattedDate = dateObj.toDateString();
+          }
+        } catch (e) {
+          // fallback to original
+        }
+      }
+
+      const timeDisplay = formatTime12(appointment.time);
+      const adminEmails = ['jocephmoreno@gmail.com', 'triciapuertollano@gmail.com'];
+
+      // Build detailed appointment info
+      const appointmentDetails = [
+        `Patient Name: ${appointment.name}`,
+        `Email: ${appointment.email}`,
+        `Phone: ${appointment.phone}`,
+        `Procedure: ${appointment.procedure}`,
+        `Date: ${formattedDate}`,
+        `Time: ${timeDisplay}`,
+        `Branch: ${appointment.branch}`,
+        `Status: ${appointment.status}`,
+        `Number of Patients: ${appointment.numPatients || 1}`,
+        `Under HMO: ${appointment.underHMO || 'No'}`
+      ];
+
+      if (appointment.underHMO === 'Yes') {
+        appointmentDetails.push(`HMO Provider: ${appointment.hmoProvider || 'N/A'}`);
+        appointmentDetails.push(`Membership Number: ${appointment.hmoMembershipNumber || 'N/A'}`);
+        appointmentDetails.push(`Employer/Company: ${appointment.employer || 'N/A'}`);
+      }
+
+      if (appointment.note) {
+        appointmentDetails.push(`Notes: ${appointment.note}`);
+      }
+
+      const emailSubject = `New Appointment Request - ${appointment.name} (${formattedDate} ${timeDisplay})`;
+      const emailText = `A new appointment has been scheduled.\n\nAppointment Details:\n${appointmentDetails.join('\n')}\n\nPlease log in to the admin panel to review and approve this appointment.`;
+      const emailHtml = `
+        <h2>New Appointment Request</h2>
+        <p>A new appointment has been scheduled and requires your attention.</p>
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+          <h3>Appointment Details:</h3>
+          <ul style="list-style-type: none; padding: 0;">
+            ${appointmentDetails.map(detail => `<li style="margin: 5px 0;"><strong>${detail.split(':')[0]}:</strong> ${detail.split(':').slice(1).join(':').trim()}</li>`).join('')}
+          </ul>
+        </div>
+        <p>Please log in to the admin panel to review and approve this appointment.</p>
+        <p><strong>Status:</strong> <span style="color: orange; font-weight: bold;">PENDING APPROVAL</span></p>
+      `;
+
+      // Send to all admin emails
+      for (const adminEmail of adminEmails) {
+        try {
+          await sendMail({
+            to: adminEmail,
+            subject: emailSubject,
+            text: emailText,
+            html: emailHtml
+          });
+        } catch (mailErr) {
+          console.error(`Failed to send admin notification to ${adminEmail}:`, mailErr);
+          // Continue to next admin email even if one fails
+        }
+      }
+
+      console.log(`Admin notification emails sent for appointment ${appointment.id}`);
+    } catch (notificationErr) {
+      console.error('Failed to send admin notification emails:', notificationErr);
+      // Don't fail the appointment creation if email fails
+    }
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error('General error in POST /appointments:', err, { body: req.body });
